@@ -135,8 +135,6 @@ class Customer implements Runnable {
     public void run() {
         System.out.println("Customer " + id + " created");
         try {
-            Thread.sleep(1);
-
             for (int visits = 0; visits < 3; visits++) {
                 Random r = new Random();
                 int action = r.nextInt(2);
@@ -152,7 +150,7 @@ class Customer implements Runnable {
 
                         Bank.teller_resource.acquire();
                         Bank.sit_down_w_teller.release();
-//                        Bank.teller_ready.acquire();
+
                         Bank.teller_transaction.acquire();
                         Bank.teller_receipt.release();
 
@@ -206,9 +204,6 @@ class Teller implements Runnable {
         System.out.println("Teller " + this.id + " created");
         try {
             while (true) {
-
-
-                Thread.sleep(1);
                 Bank.num_in_teller_line.acquire();
 
                 // mutex stuff for the LinkedList resource
@@ -218,26 +213,29 @@ class Teller implements Runnable {
                 // end mutex
 
                 Bank.sit_down_w_teller.acquire();
-//                Bank.teller_ready.release();
                 System.out.println("Teller " + this.id + " begins serving Customer " + c.getId());
 
                 int trans_type = (new Random()).nextInt(2);
+                Thread.sleep(100);
                 switch (trans_type) {
                     case 0: { // deposit is being made
+                        Thread.sleep(400);
                         int depo = c.deposit();
                         System.out.println("Customer " + c.getId() + " requests of teller " + this.id + " to make a deposit of $" + depo);
                         Bank.teller_transaction.release();
                         System.out.println("Teller " + this.id + " processes deposit of $" + depo + " for Customer " + c.getId());
+                        Thread.sleep(100);
                         Bank.teller_receipt.acquire();
                         System.out.println("Customer " + c.getId() + " gets cash and receipt from Teller " + this.id);
                         break;
                     }
                     case 1: { // withdraw is being made
-                        System.out.println("in withdraw");
+                        Thread.sleep(400);
                         int with = c.withdraw();
                         System.out.println("Customer " + c.getId() + " requests of teller " + this.id + " to make a withdrawal of $" + with);
                         Bank.teller_transaction.release();
                         System.out.println("Teller " + this.id + " processes withdrawal of $" + with + " for Customer " + c.getId());
+                        Thread.sleep(100);
                         Bank.teller_receipt.acquire();
                         System.out.println("Customer " + c.getId() + " gets receipt from Teller " + this.id);
                         break;
@@ -247,8 +245,6 @@ class Teller implements Runnable {
 
                 }
                 Bank.teller_resource.release();
-
-
             }
 
         } catch (InterruptedException e) {
@@ -272,8 +268,6 @@ class LoanOfficer implements Runnable {
 
         try {
             while (true) {
-
-                Thread.sleep(1);
                 Bank.num_in_loan_line.acquire();
 
                 // mutex stuff
@@ -282,13 +276,16 @@ class LoanOfficer implements Runnable {
                 Bank.loan_line_resource.release();
                 // end mutex
 
+                Thread.sleep(100);
                 Bank.sit_down_w_LO.acquire(); // loan officer now knows that customer is ready
                 System.out.println("Loan Officer begins serving Customer " + c.getId());
+                Thread.sleep(400);
                 int loan = c.generateLoan();
                 System.out.println("Customer " + c.getId() + " requests of Loan Officer to apply for a loan of $" + loan);
                 Bank.loan_transaction.release();
                 // now we wait for customer to give the loan officer a transaction confirmation
                 System.out.println("Loan Officer approves of loan for Customer " + c.getId());
+                Thread.sleep(100);
                 Bank.received_loan.acquire();
                 System.out.println("Customer " + c.getId() + " gets loan from Loan Officer");
             }
