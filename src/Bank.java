@@ -12,20 +12,19 @@ public class Bank {
     //    protected static Semaphore[] teller_available = new Semaphore[5];
     protected static Semaphore teller_transaction = new Semaphore(0, true);
     protected static Semaphore teller_receipt = new Semaphore(0, true);
-    protected static Semaphore sit_down_w_LO = new Semaphore(0, true);
     protected static Semaphore cust_teller = new Semaphore(0, true); // customer interacting with teller
     protected static Semaphore cust_loan = new Semaphore(0, true); // customer interacting with loan officer
     protected static Semaphore teller_line_resource = new Semaphore(1, true);
     protected static Semaphore available_teller = new Semaphore(5, true);
 
 
-    // Loan semaphores
+    // Loan Officer semaphores
     protected static Semaphore loan_line_resource = new Semaphore(1, true);
     protected static Semaphore loan_officer_resource = new Semaphore(1, true);
     protected static Semaphore num_in_loan_line = new Semaphore(0, true);
     protected static Semaphore loan_transaction = new Semaphore(0, true);
     protected static Semaphore received_loan = new Semaphore(0, true);
-
+    protected static Semaphore sit_down_w_LO = new Semaphore(0, true);
 
 
     public static LinkedList<Customer> teller_line = new LinkedList<>();
@@ -141,7 +140,7 @@ class Customer implements Runnable {
 
                 action = 1; // remove this before turning in
 
-                System.out.println("before customer action is decided");
+//                System.out.println("before customer action is decided");
                 switch (action) {
                     case 0: { // go to the teller line
                         // need to make sure no one else is using this resource
@@ -158,7 +157,7 @@ class Customer implements Runnable {
                     }
 
                     case 1: { // go to the loan officer line
-                        System.out.println("customer chose loan officer line");
+//                        System.out.println("customer chose loan officer line");
 
                         // need to make sure no one else is using this resource, MUTEX for loan_line
                         Bank.loan_line_resource.acquire();
@@ -208,9 +207,9 @@ class Teller implements Runnable {
 
 
                 Thread.sleep(1);
-                System.out.println("is someone in the line?");
+//                System.out.println("is someone in the line?");
                 Bank.available_teller.acquire(); // someone is in line
-                System.out.println("acquiring the loan officer's line");
+//                System.out.println("acquiring the loan officer's line");
 
                 // mutex stuff for the LinkedList resource
                 Bank.teller_line_resource.acquire();
