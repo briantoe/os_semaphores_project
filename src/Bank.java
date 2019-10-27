@@ -5,22 +5,22 @@ import java.util.concurrent.Semaphore;
 
 public class Bank {
 
-    public static final int CUST_NUM = 2; // this will be 5 for the final submission
+    public static final int CUST_NUM = 5; // this will be 5 for the final submission
     public static final int TELLER_NUM = 2;
     public static final int LOAN_OFFICER_NUM = 1;
 
-    //    protected static Semaphore[] teller_available = new Semaphore[5];
+    // Teller Semaphores
+    protected static Semaphore teller_line_resource = new Semaphore(1, true);
+    protected static Semaphore num_in_teller_line = new Semaphore(0, true);
     protected static Semaphore teller_transaction = new Semaphore(0, true);
     protected static Semaphore teller_receipt = new Semaphore(0, true);
-    protected static Semaphore cust_teller = new Semaphore(0, true); // customer interacting with teller
-    protected static Semaphore cust_loan = new Semaphore(0, true); // customer interacting with loan officer
-    protected static Semaphore teller_line_resource = new Semaphore(1, true);
-    protected static Semaphore available_teller = new Semaphore(5, true);
+    protected static Semaphore teller_resource = new Semaphore(TELLER_NUM, true);
+    protected static Semaphore sit_down_w_teller = new Semaphore(0, true);
 
 
     // Loan Officer semaphores
     protected static Semaphore loan_line_resource = new Semaphore(1, true);
-    protected static Semaphore loan_officer_resource = new Semaphore(1, true);
+    protected static Semaphore loan_officer_resource = new Semaphore(LOAN_OFFICER_NUM, true);
     protected static Semaphore num_in_loan_line = new Semaphore(0, true);
     protected static Semaphore loan_transaction = new Semaphore(0, true);
     protected static Semaphore received_loan = new Semaphore(0, true);
@@ -30,12 +30,14 @@ public class Bank {
     public static LinkedList<Customer> teller_line = new LinkedList<>();
     public static LinkedList<Customer> loan_line = new LinkedList<>();
 
+    Bank(){}
 
-    public static void main(String[] args) {
+    public static void runBank() {
         Thread[] cust_threads = new Thread[CUST_NUM];
         Thread[] teller_threads = new Thread[2];
         Thread loan_thread;
 
+        System.out.println("BANK IS NOW OPEN\n");
 
         for (int i = 0; i < 2; i++) {
             teller_threads[i] = new Thread(new Teller(i + 1));
@@ -63,6 +65,7 @@ public class Bank {
             }
         }
 
+        System.out.println("BANK IS NOW CLOSED");
         // last step
         System.out.println("\n\nBANK SUMMARY");
         System.out.printf("          %25s %15s %n", "Ending Balance", "Loan Amount");
@@ -138,26 +141,25 @@ class Customer implements Runnable {
                 Random r = new Random();
                 int action = r.nextInt(2);
 
-                action = 1; // remove this before turning in
-
-//                System.out.println("before customer action is decided");
                 switch (action) {
                     case 0: { // go to the teller line
-                        // need to make sure no one else is using this resource
+                        System.out.println("Customer " + this.id + " Got in teller line");
                         Bank.teller_line_resource.acquire();
                         Bank.teller_line.addLast(this);
+                        Bank.num_in_teller_line.release();
                         Bank.teller_line_resource.release();
-                        Bank.available_teller.acquire();
 
-                        Bank.cust_teller.release();
-                        Bank.teller_transaction.release();
 
-                        Bank.available_teller.release();
+                        Bank.teller_resource.acquire();
+                        Bank.sit_down_w_teller.release();
+//                        Bank.teller_ready.acquire();
+                        Bank.teller_transaction.acquire();
+                        Bank.teller_receipt.release();
+
                         break;
                     }
 
                     case 1: { // go to the loan officer line
-//                        System.out.println("customer chose loan officer line");
 
                         // need to make sure no one else is using this resource, MUTEX for loan_line
                         Bank.loan_line_resource.acquire();
@@ -207,18 +209,16 @@ class Teller implements Runnable {
 
 
                 Thread.sleep(1);
-//                System.out.println("is someone in the line?");
-                Bank.available_teller.acquire(); // someone is in line
-//                System.out.println("acquiring the loan officer's line");
+                Bank.num_in_teller_line.acquire();
 
                 // mutex stuff for the LinkedList resource
                 Bank.teller_line_resource.acquire();
-                System.out.println("line acquired");
                 Customer c = Bank.teller_line.removeFirst();
-                System.out.println("Customer " + c.getId() + " has left the line");
                 Bank.teller_line_resource.release();
+                // end mutex
 
-                Bank.cust_teller.acquire(); // wait for the customer to be ready to interact with teller
+                Bank.sit_down_w_teller.acquire();
+//                Bank.teller_ready.release();
                 System.out.println("Teller " + this.id + " begins serving Customer " + c.getId());
 
                 int trans_type = (new Random()).nextInt(2);
@@ -233,6 +233,7 @@ class Teller implements Runnable {
                         break;
                     }
                     case 1: { // withdraw is being made
+                        System.out.println("in withdraw");
                         int with = c.withdraw();
                         System.out.println("Customer " + c.getId() + " requests of teller " + this.id + " to make a withdrawal of $" + with);
                         Bank.teller_transaction.release();
@@ -245,6 +246,8 @@ class Teller implements Runnable {
                         throw new IllegalStateException("Unexpected value: " + trans_type);
 
                 }
+                Bank.teller_resource.release();
+
 
             }
 
@@ -270,8 +273,7 @@ class LoanOfficer implements Runnable {
         try {
             while (true) {
 
-                Thread.sleep(1000);
-//                Bank.available_loan.acquire(); // someone is in line
+                Thread.sleep(1);
                 Bank.num_in_loan_line.acquire();
 
                 // mutex stuff
